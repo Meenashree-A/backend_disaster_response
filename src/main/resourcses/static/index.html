@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Disaster Report - OpenStreetMap Version</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <link rel="stylesheet" href="index.css"> 
+    <style>
+        #map { height: 300px; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <div id="reportPage">
+        <h2>Disaster Report Form</h2>
+
+        <div id="map"></div>
+
+        <input type="text" id="location" placeholder="Detecting Location..." readonly>
+
+        <label for="phone">Phone Number:</label>
+        <input type="tel" id="phone" placeholder="Enter your phone number" pattern="[0-9]{10}" required>
+
+        <label for="type">Type of Need:</label>
+        <select id="type">
+            <option value="Food">Food</option>
+            <option value="Water">Water</option>
+            <option value="Medicine">Medicine</option>
+        </select>
+
+        <textarea id="description" placeholder="Describe the situation..."></textarea>
+
+        <input type="file" id="photo">
+
+        <button onclick="submitReport()">Submit Report</button>
+        <p id="response"></p>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([13.0827, 80.2707], 13); // Default Chennai view
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var marker;
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(successLocation, errorLocation);
+        } else {
+            alert("Geolocation not supported by this browser.");
+        }
+
+        function successLocation(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            document.getElementById('location').value = lat + ", " + lng;
+
+            map.setView([lat, lng], 15);
+            marker = L.marker([lat, lng], {draggable: true}).addTo(map)
+                     .bindPopup("Auto-detected Location. You can drag me!").openPopup();
+
+            marker.on('dragend', function(e) {
+                const changedPos = marker.getLatLng();
+                document.getElementById('location').value = changedPos.lat + ", " + changedPos.lng;
+            });
+        }
+
+        function errorLocation(err) {
+            console.warn(`ERROR(${err.code}): ${err.message}`);
+            alert("Unable to detect location. Please click on the map to select location.");
+        }
+
+        map.on('click', function(e) {
+            const latlng = e.latlng;
+            document.getElementById('location').value = latlng.lat + ", " + latlng.lng;
+
+            if (marker) { map.removeLayer(marker); }
+            marker = L.marker([latlng.lat, latlng.lng], {draggable: true}).addTo(map)
+                      .bindPopup("Manually Selected Location. You can drag me!").openPopup();
+
+            marker.on('dragend', function(e) {
+                const changedPos = marker.getLatLng();
+                document.getElementById('location').value = changedPos.lat + ", " + changedPos.lng;
+            });
+        });
+
+        async function submitReport() {
+            const formData = new FormData();
+            formData.append("location", document.getElementById('location').value);
+            formData.append("phone", document.getElementById('phone').value);
+            formData.append("type", document.getElementById('type').value);
+            formData.append("description", document.getElementById('description').value);
+            formData.append("file", document.getElementById('photo').files[0]);
+
+            const response = await fetch('http://localhost:8080/api/needs', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.text();
+            document.getElementById('response').innerText = result;
+        }
+    </script>
+</body>
+</html>

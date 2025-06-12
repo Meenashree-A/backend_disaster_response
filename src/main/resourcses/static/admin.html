@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin - Needs List</title>
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+    <!-- Login Form -->
+    <div id="loginForm">
+        <h2>Admin Login</h2>
+        <input type="email" id="email" placeholder="Email" required><br>
+        <input type="password" id="password" placeholder="Password" required><br>
+        <button onclick="login()">Login</button>
+        <p id="loginMessage" style="color:red;"></p>
+    </div>
+
+    <!-- Admin Page (Hidden by default) -->
+    <div id="adminPage" style="display:none;">
+        <h2 style="text-align:center;">All Reported Needs</h2>
+        <button onclick="logout()" style="float:right; margin-right: 20px;">Logout</button>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="needsTableBody"></tbody>
+        </table>
+    </div>
+
+    <!-- Details Section -->
+    <div id="detailsSection" style="display:none; padding:20px; border:1px solid #000; margin:20px;">
+        <h3>Need Details</h3>
+        <p><strong>ID:</strong> <span id="detailId"></span></p>
+        <p><strong>Location:</strong> <span id="detailLocation"></span></p>
+        <p><strong>Type:</strong> <span id="detailType"></span></p>
+        <p><strong>Description:</strong> <span id="detailDescription"></span></p>
+        <p><strong>Phone:</strong> <span id="detailPhone"></span></p>
+        <p><strong>File:</strong> <a href="#" target="_blank" id="detailFileUrl">View File</a></p>
+        <p><strong>Map:</strong> <a href="#" target="_blank" id="detailMapLink">View on Map</a></p>
+        <button onclick="hideDetails()">Close</button>
+    </div>
+
+    <script>
+        const ADMIN_EMAIL = "meenashreeasokan@gmail.com";
+        const ADMIN_PASSWORD = "meena123";
+        let needsData = [];
+        let lastSeenIds = new Set();
+
+        // On page load check session
+        window.onload = function() {
+            if (sessionStorage.getItem("isLoggedIn") === "true") {
+                showAdminPage();
+            } else {
+                showLoginPage();
+            }
+        };
+
+        function login() {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+                sessionStorage.setItem("isLoggedIn", "true");
+                showAdminPage();
+            } else {
+                document.getElementById('loginMessage').innerText = "Invalid credentials. Please try again.";
+            }
+        }
+
+        function logout() {
+            sessionStorage.removeItem("isLoggedIn");
+            showLoginPage();
+        }
+
+        function showAdminPage() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('adminPage').style.display = 'block';
+            loadNeeds();
+            setInterval(loadNeeds, 5000); // Auto-refresh every 5 seconds
+        }
+
+        function showLoginPage() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('adminPage').style.display = 'none';
+            document.getElementById('detailsSection').style.display = 'none';
+        }
+
+        function loadNeeds() {
+            fetch('http://localhost:8080/api/needs/all')
+                .then(response => response.json())
+                .then(data => {
+                    if (!Array.isArray(data)) {
+                        console.error("Invalid data format:", data);
+                        return;
+                    }
+
+                    const tableBody = document.getElementById('needsTableBody');
+                    tableBody.innerHTML = ''; // Clear old data
+
+                    // Check for new entries
+                    const newEntries = data.filter(need => !lastSeenIds.has(need.id));
+                    newEntries.forEach(need => {
+                        alert(`New Need Reported!\nID: ${need.id}\nType: ${need.type}\nLocation: ${need.location}`);
+                        lastSeenIds.add(need.id);
+                    });
+
+                    needsData = data;
+                    data.forEach((need, index) => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${need.id}</td>
+                            <td><button onclick="viewDetails(${index})">View Entire</button></td>
+                        `;
+                        tableBody.appendChild(row);
+
+                        // Update lastSeenIds (for first load)
+                        if (!lastSeenIds.has(need.id)) {
+                            lastSeenIds.add(need.id);
+                        }
+                    });
+                })
+                .catch(error => console.error('Error loading data:', error));
+        }
+
+        function viewDetails(index) {
+            const need = needsData[index];
+            document.getElementById('detailId').innerText = need.id;
+            document.getElementById('detailLocation').innerText = need.location;
+            document.getElementById('detailType').innerText = need.type;
+            document.getElementById('detailDescription').innerText = need.description;
+            document.getElementById('detailPhone').innerText = need.phone;
+            document.getElementById('detailFileUrl').href = need.fileUrl;
+            document.getElementById('detailFileUrl').innerText = "View File";
+            document.getElementById('detailMapLink').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(need.location)}`;
+            document.getElementById('detailMapLink').innerText = "View on Map";
+
+            document.getElementById('detailsSection').style.display = 'block';
+        }
+
+        function hideDetails() {
+            document.getElementById('detailsSection').style.display = 'none';
+        }
+    </script>
+
+</body>
+</html>
